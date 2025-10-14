@@ -437,19 +437,19 @@ let mySymbol = null;
 let countdownInterval = null;
 
 // Enhanced logging function
-function debugLog(category, message, data = null) {
-    const timestamp = new Date().toLocaleTimeString();
-    const logStyle = 'font-weight: bold; color: ';
+<!--function debugLog(category, message, data = null) {-->
+<!--    const timestamp = new Date().toLocaleTimeString();-->
+<!--    const logStyle = 'font-weight: bold; color: ';-->
 
-    const styles = {
-        'INIT': logStyle + '#9b59b6',
-        'CONNECT': logStyle + '#3498db',
-        'SUBSCRIBE': logStyle + '#2ecc71',
-        'SEND': logStyle + '#e67e22',
-        'RECEIVE': logStyle + '#27ae60',
-        'ERROR': logStyle + '#e74c3c',
-        'INFO': logStyle + '#34495e'
-    };
+<!--    const styles = {-->
+<!--        'INIT': logStyle + '#9b59b6',-->
+<!--        'CONNECT': logStyle + '#3498db',-->
+<!--        'SUBSCRIBE': logStyle + '#2ecc71',-->
+<!--        'SEND': logStyle + '#e67e22',-->
+<!--        'RECEIVE': logStyle + '#27ae60',-->
+<!--        'ERROR': logStyle + '#e74c3c',-->
+<!--        'INFO': logStyle + '#34495e'-->
+<!--    };-->
 
     console.log(`%c[${timestamp}] [${category}] ${message}`, styles[category] || styles['INFO']);
     if (data) {
@@ -468,7 +468,7 @@ function startGame() {
         return;
     }
     currentPlayer = nickname;
-    debugLog('INIT', `Starting game for player: ${nickname}`);
+<!--    debugLog('INIT', `Starting game for player: ${nickname}`);-->
     connectWebSocket();
 }
 
@@ -476,64 +476,64 @@ function connectWebSocket() {
     showScreen('matchmakingScreen');
 
     if (stompClient !== null) {
-        debugLog('CONNECT', 'Disconnecting previous STOMP client');
+<!--        debugLog('CONNECT', 'Disconnecting previous STOMP client');-->
         stompClient.disconnect(() => {
-            debugLog('CONNECT', 'Previous client disconnected');
+<!--            debugLog('CONNECT', 'Previous client disconnected');-->
         });
     }
 
-    debugLog('CONNECT', `Connecting to WebSocket: ${WS_URL}`);
+<!--    debugLog('CONNECT', `Connecting to WebSocket: ${WS_URL}`);-->
     const socket = new SockJS(WS_URL);
 
     socket.onopen = function() {
-        debugLog('CONNECT', '✅ SockJS connection OPENED');
+<!--        debugLog('CONNECT', '✅ SockJS connection OPENED');-->
     };
     socket.onclose = function() {
-        debugLog('ERROR', '❌ SockJS connection CLOSED');
+<!--        debugLog('ERROR', '❌ SockJS connection CLOSED');-->
     };
     socket.onerror = function(e) {
-        debugLog('ERROR', '❌ SockJS ERROR', e);
+<!--        debugLog('ERROR', '❌ SockJS ERROR', e);-->
     };
 
     stompClient = Stomp.over(socket);
     stompClient.debug = function(str) {
-        debugLog('INFO', 'STOMP: ' + str);
+<!--        debugLog('INFO', 'STOMP: ' + str);-->
     };
 
     stompClient.connect({}, function(frame) {
-        debugLog('CONNECT', '✅ STOMP Connected!', frame);
+<!--        debugLog('CONNECT', '✅ STOMP Connected!', frame);-->
 
         // Subscribe to matchmaking queue with player-specific destination
         const matchmakingDest = '/queue/matchmaking-' + currentPlayer;
-        debugLog('SUBSCRIBE', `Subscribing to: ${matchmakingDest}`);
+<!--        debugLog('SUBSCRIBE', `Subscribing to: ${matchmakingDest}`);-->
 
         stompClient.subscribe(matchmakingDest, function(message) {
             const response = JSON.parse(message.body);
-            debugLog('RECEIVE', 'Matchmaking response received', response);
+<!--            debugLog('RECEIVE', 'Matchmaking response received', response);-->
 
             if (response.status === 'WAITING') {
-                debugLog('INFO', '⏳ Still waiting for opponent...');
+<!--                debugLog('INFO', '⏳ Still waiting for opponent...');-->
             } else if (response.status === 'STARTED' && response.gameId) {
-                debugLog('RECEIVE', `🎮 Game STARTED! GameId: ${response.gameId}`);
+<!--                debugLog('RECEIVE', `🎮 Game STARTED! GameId: ${response.gameId}`);-->
                 currentGameId = response.gameId;
                 subscribeToGameUpdates(currentGameId);
                 showScreen('gameScreen');
             } else {
-                debugLog('ERROR', '⚠️ Unknown matchmaking response', response);
+<!--                debugLog('ERROR', '⚠️ Unknown matchmaking response', response);-->
             }
         });
 
-        debugLog('SUBSCRIBE', '✅ Successfully subscribed to matchmaking queue');
+<!--        debugLog('SUBSCRIBE', '✅ Successfully subscribed to matchmaking queue');-->
 
         // Send join request
         const joinRequest = { nickname: currentPlayer };
-        debugLog('SEND', 'Sending join request to /app/join', joinRequest);
+<!--        debugLog('SEND', 'Sending join request to /app/join', joinRequest);-->
 
         stompClient.send('/app/join', {}, JSON.stringify(joinRequest));
-        debugLog('SEND', '✅ Join request sent');
+<!--        debugLog('SEND', '✅ Join request sent');-->
 
     }, function(error) {
-        debugLog('ERROR', '❌ WebSocket connection FAILED', error);
+<!--        debugLog('ERROR', '❌ WebSocket connection FAILED', error);-->
         alert('Connection failed. Please try again.');
         showScreen('nicknameScreen');
     });
@@ -541,19 +541,19 @@ function connectWebSocket() {
 
 function subscribeToGameUpdates(gameId) {
     const gameDest = '/topic/game/' + gameId;
-    debugLog('SUBSCRIBE', `Subscribing to game updates: ${gameDest}`);
+<!--    debugLog('SUBSCRIBE', `Subscribing to game updates: ${gameDest}`);-->
 
     stompClient.subscribe(gameDest, function(gameMessage) {
         const gameState = JSON.parse(gameMessage.body);
-        debugLog('RECEIVE', '🎮 Game state update received', gameState);
+<!--        debugLog('RECEIVE', '🎮 Game state update received', gameState);-->
         updateBoard(gameState);
     });
 
-    debugLog('SUBSCRIBE', '✅ Successfully subscribed to game updates');
+<!--    debugLog('SUBSCRIBE', '✅ Successfully subscribed to game updates');-->
 }
 
 function cancelMatchmaking() {
-    debugLog('INFO', '🚫 Canceling matchmaking');
+<!--    debugLog('INFO', '🚫 Canceling matchmaking');-->
     if (stompClient) {
         stompClient.disconnect(() => debugLog('CONNECT', 'STOMP client disconnected'));
         stompClient = null;
@@ -563,16 +563,16 @@ function cancelMatchmaking() {
 }
 
 function makeMove(row, col) {
-    debugLog('SEND', `🎯 Attempting move at (${row}, ${col})`);
+<!--    debugLog('SEND', `🎯 Attempting move at (${row}, ${col})`);-->
 
     if (!currentGameId || !stompClient) {
-        debugLog('ERROR', '❌ Cannot make move: No active game or connection');
+<!--        debugLog('ERROR', '❌ Cannot make move: No active game or connection');-->
         return;
     }
 
     const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
     if (cell.classList.contains('filled')) {
-        debugLog('INFO', '⚠️ Cell already filled');
+<!--        debugLog('INFO', '⚠️ Cell already filled');-->
         return;
     }
 
@@ -583,18 +583,18 @@ function makeMove(row, col) {
         col: col
     };
 
-    debugLog('SEND', 'Sending move to /app/move', moveRequest);
+<!--    debugLog('SEND', 'Sending move to /app/move', moveRequest);-->
     stompClient.send('/app/move', {}, JSON.stringify(moveRequest));
-    debugLog('SEND', '✅ Move request sent');
+<!--    debugLog('SEND', '✅ Move request sent');-->
 }
 
 function updateBoard(gameState) {
-    debugLog('RECEIVE', '📊 Updating board', {
-        gameId: gameState.gameId,
-        status: gameState.status,
-        currentTurn: gameState.currentTurn,
-        winner: gameState.winner
-    });
+<!--    debugLog('RECEIVE', '📊 Updating board', {-->
+<!--        gameId: gameState.gameId,-->
+<!--        status: gameState.status,-->
+<!--        currentTurn: gameState.currentTurn,-->
+<!--        winner: gameState.winner-->
+<!--    });-->
 
     const board = gameState.board;
     for (let i = 0; i < 3; i++) {
@@ -626,7 +626,7 @@ function updateBoard(gameState) {
         document.getElementById('player1Stats').textContent =
             `${gameState.player1.wins}/${gameState.player1.losses}/${gameState.player1.draws}`;
         mySymbol = gameState.player1.nickname === currentPlayer ? 'X' : 'O';
-        debugLog('INFO', `My symbol is: ${mySymbol}`);
+<!--        debugLog('INFO', `My symbol is: ${mySymbol}`);-->
     }
 
     if (gameState.player2) {
@@ -638,7 +638,7 @@ function updateBoard(gameState) {
 
     const messageDiv = document.getElementById('gameMessage');
     if (gameState.status === 'FINISHED') {
-        debugLog('INFO', '🏁 Game FINISHED!', { winner: gameState.winner, mySymbol: mySymbol });
+<!--        debugLog('INFO', '🏁 Game FINISHED!', { winner: gameState.winner, mySymbol: mySymbol });-->
         messageDiv.style.display = 'block';
 
         if (gameState.winner === mySymbol) {
@@ -659,7 +659,7 @@ function updateBoard(gameState) {
 }
 
 function playAgain() {
-    debugLog('INFO', '🔄 Play again clicked');
+<!--    debugLog('INFO', '🔄 Play again clicked');-->
     document.getElementById('playAgainBtn').style.display = 'none';
     document.getElementById('gameMessage').style.display = 'none';
 
@@ -673,7 +673,7 @@ function playAgain() {
 }
 
 function exitGame() {
-    debugLog('INFO', '🚪 Exiting game');
+<!--    debugLog('INFO', '🚪 Exiting game');-->
     if (stompClient) {
         stompClient.disconnect(() => debugLog('CONNECT', 'STOMP client disconnected'));
         stompClient = null;
@@ -692,11 +692,11 @@ function hideLeaderboard() {
 }
 
 function loadLeaderboard() {
-    debugLog('INFO', 'Loading leaderboard...');
+<!--    debugLog('INFO', 'Loading leaderboard...');-->
     fetch(API_URL + '/api/leaderboard?limit=10')
         .then(response => response.json())
         .then(data => {
-            debugLog('RECEIVE', 'Leaderboard data received', data);
+<!--            debugLog('RECEIVE', 'Leaderboard data received', data);-->
             const tbody = document.getElementById('leaderboardBody');
             tbody.innerHTML = '';
             data.forEach((player, index) => {
@@ -715,7 +715,7 @@ function loadLeaderboard() {
             }
         })
         .catch(error => {
-            debugLog('ERROR', 'Error loading leaderboard', error);
+<!--            debugLog('ERROR', 'Error loading leaderboard', error);-->
             document.getElementById('leaderboardBody').innerHTML =
                 '<tr><td colspan="4" style="text-align: center;">Error loading leaderboard</td></tr>';
         });
@@ -726,7 +726,7 @@ function startCountdown(seconds) {
     let timeLeft = seconds;
 
     if (!countdownElement) {
-        debugLog('ERROR', 'Countdown element not found!');
+<!--        debugLog('ERROR', 'Countdown element not found!');-->
         return;
     }
     countdownElement.textContent = `It usually takes ${timeLeft} seconds.`;
@@ -743,7 +743,7 @@ function startCountdown(seconds) {
         }
     }, 1000);
 
-    debugLog('INFO', 'Countdown started');
+<!--    debugLog('INFO', 'Countdown started');-->
 }
 
 function showScreen(screenId) {
@@ -751,7 +751,7 @@ function showScreen(screenId) {
         screen.classList.remove('active');
     });
     document.getElementById(screenId).classList.add('active');
-    debugLog('INFO', `Screen changed to: ${screenId}`);
+<!--    debugLog('INFO', `Screen changed to: ${screenId}`);-->
 
     if(screenId === 'matchmakingScreen') {
         startCountdown(26);
