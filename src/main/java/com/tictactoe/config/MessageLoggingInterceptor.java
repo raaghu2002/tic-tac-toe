@@ -21,11 +21,11 @@ public class MessageLoggingInterceptor implements ChannelInterceptor {
             String destination = accessor.getDestination();
             String sessionId = accessor.getSessionId();
 
-            log.info("[MESSAGE] Command: {} | Destination: {} | SessionId: {}",
-                    command, destination, sessionId);
+//            log.info("[MESSAGE] Command: {} | Destination: {} | SessionId: {}",
+//                    command, destination, sessionId);
 
             if (command == StompCommand.SEND) {
-                log.info("[MESSAGE-SEND] Payload: {}", new String((byte[]) message.getPayload()));
+//                log.info("[MESSAGE-SEND] Payload: {}", new String((byte[]) message.getPayload()));
             }
         }
 

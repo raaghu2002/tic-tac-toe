@@ -22,7 +22,7 @@ public class PlayerService {
         Optional<Player> existingPlayer = playerRepository.findByNickname(nickname);
 
         if (existingPlayer.isPresent()) {
-            log.info("Player found: {}", nickname);
+//            log.info("Player found: {}", nickname);
             return existingPlayer.get();
         }
 
@@ -34,7 +34,7 @@ public class PlayerService {
         newPlayer.setTotalScore(0);
 
         Player saved = playerRepository.save(newPlayer);
-        log.info("New player created: {}", nickname);
+//        log.info("New player created: {}", nickname);
         return saved;
     }
 
@@ -45,7 +45,7 @@ public class PlayerService {
 
         player.addWin();
         playerRepository.save(player);
-        log.info("Win recorded for player: {}", nickname);
+//        log.info("Win recorded for player: {}", nickname);
     }
 
     @Transactional
@@ -55,7 +55,7 @@ public class PlayerService {
 
         player.addLoss();
         playerRepository.save(player);
-        log.info("Loss recorded for player: {}", nickname);
+//        log.info("Loss recorded for player: {}", nickname);
     }
 
     @Transactional
@@ -65,7 +65,7 @@ public class PlayerService {
 
         player.addDraw();
         playerRepository.save(player);
-        log.info("Draw recorded for player: {}", nickname);
+//        log.info("Draw recorded for player: {}", nickname);
     }
 
     public List<Player> getLeaderboard(int limit) {

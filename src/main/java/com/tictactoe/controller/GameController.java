@@ -23,39 +23,39 @@ public class GameController {
 
     @MessageMapping("/join")
     public void joinGame(JoinGameRequest request) {
-        log.info("🔵 [RAW-REQUEST] Received join request: {}", request);
+//        log.info("🔵 [RAW-REQUEST] Received join request: {}", request);
 
         if (request == null) {
-            log.error("❌ [JOIN] Request is NULL!");
+//            log.error("❌ [JOIN] Request is NULL!");
             return;
         }
 
         String nickname = request.getNickname();
 
         if (nickname == null || nickname.trim().isEmpty()) {
-            log.error("❌ [JOIN] Nickname is NULL or EMPTY! Request: {}", request);
+//            log.error("❌ [JOIN] Nickname is NULL or EMPTY! Request: {}", request);
             return;
         }
 
         nickname = nickname.trim(); // Extra safety
-        log.info("🎮 [JOIN] Player joining: '{}' (length: {})", nickname, nickname.length());
+//        log.info("🎮 [JOIN] Player joining: '{}' (length: {})", nickname, nickname.length());
 
         // Create or get player
         Player player = playerService.createOrGetPlayer(nickname);
-        log.info("👤 [JOIN] Player object created/retrieved: {}", player.getNickname());
+//        log.info("👤 [JOIN] Player object created/retrieved: {}", player.getNickname());
 
         // Join matchmaking
         String gameId = gameService.joinMatchmaking(player);
-        log.info("🎲 [JOIN] Matchmaking result for {}: gameId={}", nickname, gameId);
+//        log.info("🎲 [JOIN] Matchmaking result for {}: gameId={}", nickname, gameId);
 
         if (gameId != null) {
             // Game found! Notify both players with gameId first
             Game game = gameService.getGame(gameId);
 
-            log.info("✅ [GAME-CREATED] Game: {} | Player1: {} | Player2: {}",
-                    gameId,
-                    game.getPlayer1().getNickname(),
-                    game.getPlayer2().getNickname());
+//            log.info("✅ [GAME-CREATED] Game: {} | Player1: {} | Player2: {}",
+//                    gameId,
+//                    game.getPlayer1().getNickname(),
+//                    game.getPlayer2().getNickname());
 
             // Send matchmaking success to BOTH players with gameId
             MatchmakingResponse matchmakingResponse = new MatchmakingResponse();
@@ -66,13 +66,13 @@ public class GameController {
             String destination1 = "/queue/matchmaking-" + game.getPlayer1().getNickname();
             String destination2 = "/queue/matchmaking-" + game.getPlayer2().getNickname();
 
-            log.info("📤 [NOTIFY-P1] Sending to: {} | Player: {} | GameId: {}",
-                    destination1, game.getPlayer1().getNickname(), gameId);
-            messagingTemplate.convertAndSend(destination1, matchmakingResponse);
+//            log.info("📤 [NOTIFY-P1] Sending to: {} | Player: {} | GameId: {}",
+//                    destination1, game.getPlayer1().getNickname(), gameId);
+//            messagingTemplate.convertAndSend(destination1, matchmakingResponse);
 
-            log.info("📤 [NOTIFY-P2] Sending to: {} | Player: {} | GameId: {}",
-                    destination2, game.getPlayer2().getNickname(), gameId);
-            messagingTemplate.convertAndSend(destination2, matchmakingResponse);
+//            log.info("📤 [NOTIFY-P2] Sending to: {} | Player: {} | GameId: {}",
+//                    destination2, game.getPlayer2().getNickname(), gameId);
+//            messagingTemplate.convertAndSend(destination2, matchmakingResponse);
 
             // Small delay to ensure clients subscribe to game topic
             new Thread(() -> {
@@ -82,18 +82,18 @@ public class GameController {
                     GameStateResponse response = buildGameStateResponse(game, "Game started!");
                     String gameTopic = "/topic/game/" + gameId;
 
-                    log.info("📤 [GAME-STATE] Sending initial state to: {}", gameTopic);
-                    log.info("📊 [GAME-STATE] Board: {} | Turn: {} | Status: {}",
-                            java.util.Arrays.deepToString(game.getBoard()),
-                            game.getCurrentTurn(),
-                            game.getStatus());
+//                    log.info("📤 [GAME-STATE] Sending initial state to: {}", gameTopic);
+//                    log.info("📊 [GAME-STATE] Board: {} | Turn: {} | Status: {}",
+//                            java.util.Arrays.deepToString(game.getBoard()),
+//                            game.getCurrentTurn(),
+//                            game.getStatus());
 
                     messagingTemplate.convertAndSend(gameTopic, response);
-                    log.info("✅ [GAME-STATE] Initial state sent successfully");
+//                    log.info("✅ [GAME-STATE] Initial state sent successfully");
 
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    log.error("❌ [ERROR] Interrupted while sending initial game state", e);
+//                    log.error("❌ [ERROR] Interrupted while sending initial game state", e);
                 }
             }).start();
 
@@ -104,10 +104,10 @@ public class GameController {
             response.setMessage("Finding opponent...");
 
             String destination = "/queue/matchmaking-" + nickname;
-            log.info("⏳ [WAITING] Player {} added to queue | Sending to: {}", nickname, destination);
+//            log.info("⏳ [WAITING] Player {} added to queue | Sending to: {}", nickname, destination);
 
             messagingTemplate.convertAndSend(destination, response);
-            log.info("📤 [WAITING] Wait notification sent to {}", nickname);
+//            log.info("📤 [WAITING] Wait notification sent to {}", nickname);
         }
     }
 
@@ -118,10 +118,10 @@ public class GameController {
         int row = request.getRow();
         int col = request.getCol();
 
-        log.info("🎯 [MOVE] Player: {} | Position: ({},{}) | Game: {}", nickname, row, col, gameId);
+//        log.info("🎯 [MOVE] Player: {} | Position: ({},{}) | Game: {}", nickname, row, col, gameId);
 
         boolean success = gameService.makeMove(gameId, nickname, row, col);
-        log.info("🎯 [MOVE-RESULT] Success: {} | Player: {}", success, nickname);
+//        log.info("🎯 [MOVE-RESULT] Success: {} | Player: {}", success, nickname);
 
         if (success) {
             Game game = gameService.getGame(gameId);
@@ -136,7 +136,7 @@ public class GameController {
                     message = "Game ended in a draw!";
                     playerService.recordDraw(game.getPlayer1().getNickname());
                     playerService.recordDraw(game.getPlayer2().getNickname());
-                    log.info("🤝 [GAME-END] Game {} ended in DRAW", gameId);
+//                    log.info("🤝 [GAME-END] Game {} ended in DRAW", gameId);
                 } else {
                     Player winnerPlayer = winner.equals("X") ? game.getPlayer1() : game.getPlayer2();
                     Player loserPlayer = winner.equals("X") ? game.getPlayer2() : game.getPlayer1();
@@ -145,7 +145,7 @@ public class GameController {
 
                     playerService.recordWin(winnerPlayer.getNickname());
                     playerService.recordLoss(loserPlayer.getNickname());
-                    log.info("🏆 [GAME-END] Game {} won by {} ({})", gameId, winnerPlayer.getNickname(), winner);
+//                    log.info("🏆 [GAME-END] Game {} won by {} ({})", gameId, winnerPlayer.getNickname(), winner);
                 }
 
                 // End the game after a delay
@@ -153,7 +153,7 @@ public class GameController {
                     try {
                         Thread.sleep(5000);
                         gameService.endGame(gameId);
-                        log.info("🔚 [CLEANUP] Game {} cleaned up", gameId);
+//                        log.info("🔚 [CLEANUP] Game {} cleaned up", gameId);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     }
@@ -163,10 +163,10 @@ public class GameController {
             GameStateResponse response = buildGameStateResponse(game, message);
             String gameTopic = "/topic/game/" + gameId;
 
-            log.info("📤 [UPDATE] Sending game update to: {} | Turn: {}", gameTopic, game.getCurrentTurn());
+//            log.info("📤 [UPDATE] Sending game update to: {} | Turn: {}", gameTopic, game.getCurrentTurn());
             messagingTemplate.convertAndSend(gameTopic, response);
         } else {
-            log.warn("❌ [MOVE-FAILED] Invalid move by {} in game {}", nickname, gameId);
+//            log.warn("❌ [MOVE-FAILED] Invalid move by {} in game {}", nickname, gameId);
         }
     }
 
@@ -191,7 +191,7 @@ public class GameController {
             p1Info.setLosses(p1.getLosses());
             p1Info.setDraws(p1.getDraws());
             response.setPlayer1(p1Info);
-            log.debug("📊 [STATS] Player1: {} | W/L/D: {}/{}/{}", p1.getNickname(), p1.getWins(), p1.getLosses(), p1.getDraws());
+//            log.debug("📊 [STATS] Player1: {} | W/L/D: {}/{}/{}", p1.getNickname(), p1.getWins(), p1.getLosses(), p1.getDraws());
         }
 
         if (p2 != null) {
@@ -202,7 +202,7 @@ public class GameController {
             p2Info.setLosses(p2.getLosses());
             p2Info.setDraws(p2.getDraws());
             response.setPlayer2(p2Info);
-            log.debug("📊 [STATS] Player2: {} | W/L/D: {}/{}/{}", p2.getNickname(), p2.getWins(), p2.getLosses(), p2.getDraws());
+//            log.debug("📊 [STATS] Player2: {} | W/L/D: {}/{}/{}", p2.getNickname(), p2.getWins(), p2.getLosses(), p2.getDraws());
         }
 
         return response;

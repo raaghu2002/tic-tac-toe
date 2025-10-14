@@ -5,6 +5,7 @@ import com.tictactoe.model.Player;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -15,6 +16,7 @@ public class GameService {
     private final Map<String, Game> activeGames = new ConcurrentHashMap<>();
     private final Queue<String> waitingPlayers = new LinkedList<>();
     private final Map<String, String> playerToGameMap = new ConcurrentHashMap<>();
+    private final Map<String, LocalDateTime> playerJoinTime = new ConcurrentHashMap<>();
 
     public synchronized String joinMatchmaking(Player player) {
         String nickname = player.getNickname();
@@ -36,15 +38,46 @@ public class GameService {
             } else {
                 log.warn("⚠️ [MATCHMAKING] Existing game '{}' is null or finished, removing mapping", existingGameId);
                 playerToGameMap.remove(nickname);
+                playerJoinTime.remove(nickname);
             }
         }
 
-        // Check if there's a waiting player
+        // Check if player is already in waiting queue
+        if (waitingPlayers.contains(nickname)) {
+            log.warn("⚠️ [MATCHMAKING] Player '{}' already in waiting queue, skipping", nickname);
+            return null;
+        }
+
+        // Clean up stale waiting players (over 60 seconds old)
+        cleanupStaleWaitingPlayers();
+
+        // Check if there's a waiting player (but not the same player!)
         if (!waitingPlayers.isEmpty()) {
             String waitingPlayerNickname = waitingPlayers.poll();
 
+            // CRITICAL FIX: Prevent self-matching
+            if (waitingPlayerNickname.equals(nickname)) {
+                log.error("❌ [MATCHMAKING] Prevented self-matching for player '{}'", nickname);
+                // Put player back in queue
+                waitingPlayers.offer(nickname);
+                playerJoinTime.put(nickname, LocalDateTime.now());
+                return null;
+            }
+
             log.info("🤝 [MATCHMAKING] Found waiting player: '{}'", waitingPlayerNickname);
             log.info("🤝 [MATCHMAKING] Pairing '{}' with '{}'", waitingPlayerNickname, nickname);
+
+            // Verify both players are different
+            if (waitingPlayerNickname.equals(nickname)) {
+                log.error("❌ [CRITICAL] Self-matching detected and prevented!");
+                waitingPlayers.offer(nickname);
+                playerJoinTime.put(nickname, LocalDateTime.now());
+                return null;
+            }
+
+            // Remove from join time tracking
+            playerJoinTime.remove(waitingPlayerNickname);
+            playerJoinTime.remove(nickname);
 
             // Create new game
             String gameId = UUID.randomUUID().toString();
@@ -71,9 +104,28 @@ public class GameService {
         } else {
             // Add to waiting queue
             waitingPlayers.offer(nickname);
+            playerJoinTime.put(nickname, LocalDateTime.now());
             log.info("⏳ [MATCHMAKING] No opponent found, adding '{}' to waiting queue", nickname);
             log.info("📊 [MATCHMAKING] Waiting queue size: {}", waitingPlayers.size());
             return null;
+        }
+    }
+
+    private void cleanupStaleWaitingPlayers() {
+        LocalDateTime cutoffTime = LocalDateTime.now().minusSeconds(60);
+        List<String> toRemove = new ArrayList<>();
+
+        for (String nickname : waitingPlayers) {
+            LocalDateTime joinTime = playerJoinTime.get(nickname);
+            if (joinTime != null && joinTime.isBefore(cutoffTime)) {
+                toRemove.add(nickname);
+                log.info("🧹 [CLEANUP] Removing stale player from queue: '{}'", nickname);
+            }
+        }
+
+        for (String nickname : toRemove) {
+            waitingPlayers.remove(nickname);
+            playerJoinTime.remove(nickname);
         }
     }
 
@@ -126,11 +178,13 @@ public class GameService {
             if (game.getPlayer1() != null) {
                 String p1Nick = game.getPlayer1().getNickname();
                 playerToGameMap.remove(p1Nick);
+                playerJoinTime.remove(p1Nick);
                 log.info("🔚 [END-GAME] Removed player1 mapping: {}", p1Nick);
             }
             if (game.getPlayer2() != null) {
                 String p2Nick = game.getPlayer2().getNickname();
                 playerToGameMap.remove(p2Nick);
+                playerJoinTime.remove(p2Nick);
                 log.info("🔚 [END-GAME] Removed player2 mapping: {}", p2Nick);
             }
 
@@ -147,6 +201,7 @@ public class GameService {
 
         boolean removed = waitingPlayers.remove(nickname);
         playerToGameMap.remove(nickname);
+        playerJoinTime.remove(nickname);
 
         log.info("🚫 [CANCEL] Removed from queue: {} | Waiting players: {}", removed, waitingPlayers.size());
     }
@@ -161,5 +216,9 @@ public class GameService {
         int count = waitingPlayers.size();
         log.debug("📊 [STATS] Waiting players count: {}", count);
         return count;
+    }
+
+    public List<String> getWaitingPlayersList() {
+        return new ArrayList<>(waitingPlayers);
     }
 }
