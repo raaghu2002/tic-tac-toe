@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Tic-Tac-Toe</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .screen {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+
+        h2 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .secondary-btn {
+            background: #6c757d;
+            margin-top: 10px;
+        }
+
+        .secondary-btn:hover {
+            background: #5a6268;
+        }
+
+        /* Matchmaking Screen */
+        .loading {
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Game Board */
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .player-info {
+            text-align: center;
+        }
+
+        .player-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .player-symbol {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .symbol-x { color: #e74c3c; }
+        .symbol-o { color: #3498db; }
+
+        .turn-indicator {
+            text-align: center;
+            padding: 15px;
+            margin-bottom: 20px;
+            background: #667eea;
+            color: white;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+            aspect-ratio: 1;
+        }
+
+        .cell {
+            background: white;
+            border: 3px solid #e0e0e0;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .cell:hover:not(.filled) {
+            background: #f8f9fa;
+            border-color: #667eea;
+            transform: scale(1.05);
+        }
+
+        .cell.filled {
+            cursor: not-allowed;
+        }
+
+        .cell.x {
+            color: #e74c3c;
+        }
+
+        .cell.o {
+            color: #3498db;
+        }
+
+        .message {
+            text-align: center;
+            padding: 15px;
+            margin: 20px 0;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 10px;
+            color: #155724;
+            font-weight: 600;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+
+        .message.info {
+            background: #d1ecf1;
+            border-color: #bee5eb;
+            color: #0c5460;
+        }
+
+        /* Leaderboard */
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .leaderboard-table th,
+        .leaderboard-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .leaderboard-table th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+
+        .leaderboard-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .rank {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        @media (max-width: 600px) {
+            .screen {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .cell {
+                font-size: 36px;
+            }
+        }
+    </style>
+</head>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Multiplayer Tic-Tac-Toe</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        /* Your existing CSS (unchanged for brevity) */
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Nickname Screen -->
+    <div id="nicknameScreen" class="screen active">
+        <h1>🎮 Tic-Tac-Toe</h1>
+        <div class="input-group">
+            <label for="nickname">Who are you?</label>
+            <input type="text" id="nickname" placeholder="Enter your nickname" maxlength="20" autofocus />
+        </div>
+        <button id="continueBtn" onclick="startGame()">Continue</button>
+        <button class="secondary-btn" onclick="showLeaderboard()">🏆 Leaderboard</button>
+    </div>
+
+    <!-- Matchmaking Screen -->
+    <div id="matchmakingScreen" class="screen">
+        <button class="close-btn" onclick="cancelMatchmaking()">✕</button>
+        <h2>Finding a random player...</h2>
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>It usually takes 26 seconds.</p>
+        </div>
+        <button class="secondary-btn" onclick="cancelMatchmaking()">Cancel</button>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="gameScreen" class="screen">
+        <div class="game-info">
+            <div class="player-info">
+                <div class="player-name" id="player1Name">ACE (you)</div>
+                <div class="player-symbol symbol-x" id="player1Symbol">✕</div>
+                <div class="stats">
+                    <div><small id="player1Stats">0/0/0</small></div>
+                </div>
+            </div>
+            <div class="player-info">
+                <div class="player-name" id="player2Name">BOO (opp)</div>
+                <div class="player-symbol symbol-o" id="player2Symbol">○</div>
+                <div class="stats">
+                    <div><small id="player2Stats">0/0/0</small></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="turn-indicator" id="turnIndicator">○ Turn</div>
+
+        <div class="board" id="board">
+            <div class="cell" data-row="0" data-col="0" onclick="makeMove(0, 0)"></div>
+            <div class="cell" data-row="0" data-col="1" onclick="makeMove(0, 1)"></div>
+            <div class="cell" data-row="0" data-col="2" onclick="makeMove(0, 2)"></div>
+            <div class="cell" data-row="1" data-col="0" onclick="makeMove(1, 0)"></div>
+            <div class="cell" data-row="1" data-col="1" onclick="makeMove(1, 1)"></div>
+            <div class="cell" data-row="1" data-col="2" onclick="makeMove(1, 2)"></div>
+            <div class="cell" data-row="2" data-col="0" onclick="makeMove(2, 0)"></div>
+            <div class="cell" data-row="2" data-col="1" onclick="makeMove(2, 1)"></div>
+            <div class="cell" data-row="2" data-col="2" onclick="makeMove(2, 2)"></div>
+        </div>
+
+        <div id="gameMessage" class="message" style="display: none;"></div>
+
+        <button id="playAgainBtn" onclick="playAgain()" style="display: none;">Play Again</button>
+        <button class="secondary-btn" onclick="exitGame()">Exit Game</button>
+    </div>
+
+    <!-- Leaderboard Screen -->
+    <div id="leaderboardScreen" class="screen">
+        <button class="close-btn" onclick="hideLeaderboard()">✕</button>
+        <h2>🏆 Leaderboard</h2>
+        <table class="leaderboard-table">
+            <thead>
+            <tr>
+                <th>#</th>
+                <th>Player</th>
+                <th>W/L/D</th>
+                <th>Score</th>
+            </tr>
+            </thead>
+            <tbody id="leaderboardBody">
+            <tr><td colspan="4" style="text-align: center;">Loading...</td></tr>
+            </tbody>
+        </table>
+        <button class="secondary-btn" onclick="hideLeaderboard()">Back</button>
+    </div>
+</div>
+
+<script>
+    // Add this to replace the <script> section in your HTML
+
+const API_URL = window.location.hostname === 'localhost'
+    ? 'http://localhost:8081'
+    : window.location.origin;
+
+const WS_URL = API_URL + '/ws';
+
+let stompClient = null;
+let currentPlayer = null;
+let currentGameId = null;
+let mySymbol = null;
+let countdownInterval = null;
+
+// Enhanced logging function
+function debugLog(category, message, data = null) {
+    const timestamp = new Date().toLocaleTimeString();
+    const logStyle = 'font-weight: bold; color: ';
+
+    const styles = {
+        'INIT': logStyle + '#9b59b6',
+        'CONNECT': logStyle + '#3498db',
+        'SUBSCRIBE': logStyle + '#2ecc71',
+        'SEND': logStyle + '#e67e22',
+        'RECEIVE': logStyle + '#27ae60',
+        'ERROR': logStyle + '#e74c3c',
+        'INFO': logStyle + '#34495e'
+    };
+
+    console.log(`%c[${timestamp}] [${category}] ${message}`, styles[category] || styles['INFO']);
+    if (data) {
+        console.log('Data:', data);
+    }
+}
+
+document.getElementById('nickname').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') startGame();
+});
+
+function startGame() {
+    const nickname = document.getElementById('nickname').value.trim();
+    if (!nickname) {
+        alert('Please enter a nickname');
+        return;
+    }
+    currentPlayer = nickname;
+    debugLog('INIT', `Starting game for player: ${nickname}`);
+    connectWebSocket();
+}
+
+function connectWebSocket() {
+    showScreen('matchmakingScreen');
+
+    if (stompClient !== null) {
+        debugLog('CONNECT', 'Disconnecting previous STOMP client');
+        stompClient.disconnect(() => {
+            debugLog('CONNECT', 'Previous client disconnected');
+        });
+    }
+
+    debugLog('CONNECT', `Connecting to WebSocket: ${WS_URL}`);
+    const socket = new SockJS(WS_URL);
+
+    socket.onopen = function() {
+        debugLog('CONNECT', '✅ SockJS connection OPENED');
+    };
+    socket.onclose = function() {
+        debugLog('ERROR', '❌ SockJS connection CLOSED');
+    };
+    socket.onerror = function(e) {
+        debugLog('ERROR', '❌ SockJS ERROR', e);
+    };
+
+    stompClient = Stomp.over(socket);
+    stompClient.debug = function(str) {
+        debugLog('INFO', 'STOMP: ' + str);
+    };
+
+    stompClient.connect({}, function(frame) {
+        debugLog('CONNECT', '✅ STOMP Connected!', frame);
+
+        // Subscribe to matchmaking queue with player-specific destination
+        const matchmakingDest = '/queue/matchmaking-' + currentPlayer;
+        debugLog('SUBSCRIBE', `Subscribing to: ${matchmakingDest}`);
+
+        stompClient.subscribe(matchmakingDest, function(message) {
+            const response = JSON.parse(message.body);
+            debugLog('RECEIVE', 'Matchmaking response received', response);
+
+            if (response.status === 'WAITING') {
+                debugLog('INFO', '⏳ Still waiting for opponent...');
+            } else if (response.status === 'STARTED' && response.gameId) {
+                debugLog('RECEIVE', `🎮 Game STARTED! GameId: ${response.gameId}`);
+                currentGameId = response.gameId;
+                subscribeToGameUpdates(currentGameId);
+                showScreen('gameScreen');
+            } else {
+                debugLog('ERROR', '⚠️ Unknown matchmaking response', response);
+            }
+        });
+
+        debugLog('SUBSCRIBE', '✅ Successfully subscribed to matchmaking queue');
+
+        // Send join request
+        const joinRequest = { nickname: currentPlayer };
+        debugLog('SEND', 'Sending join request to /app/join', joinRequest);
+
+        stompClient.send('/app/join', {}, JSON.stringify(joinRequest));
+        debugLog('SEND', '✅ Join request sent');
+
+    }, function(error) {
+        debugLog('ERROR', '❌ WebSocket connection FAILED', error);
+        alert('Connection failed. Please try again.');
+        showScreen('nicknameScreen');
+    });
+}
+
+function subscribeToGameUpdates(gameId) {
+    const gameDest = '/topic/game/' + gameId;
+    debugLog('SUBSCRIBE', `Subscribing to game updates: ${gameDest}`);
+
+    stompClient.subscribe(gameDest, function(gameMessage) {
+        const gameState = JSON.parse(gameMessage.body);
+        debugLog('RECEIVE', '🎮 Game state update received', gameState);
+        updateBoard(gameState);
+    });
+
+    debugLog('SUBSCRIBE', '✅ Successfully subscribed to game updates');
+}
+
+function cancelMatchmaking() {
+    debugLog('INFO', '🚫 Canceling matchmaking');
+    if (stompClient) {
+        stompClient.disconnect(() => debugLog('CONNECT', 'STOMP client disconnected'));
+        stompClient = null;
+    }
+    currentGameId = null;
+    showScreen('nicknameScreen');
+}
+
+function makeMove(row, col) {
+    debugLog('SEND', `🎯 Attempting move at (${row}, ${col})`);
+
+    if (!currentGameId || !stompClient) {
+        debugLog('ERROR', '❌ Cannot make move: No active game or connection');
+        return;
+    }
+
+    const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+    if (cell.classList.contains('filled')) {
+        debugLog('INFO', '⚠️ Cell already filled');
+        return;
+    }
+
+    const moveRequest = {
+        gameId: currentGameId,
+        nickname: currentPlayer,
+        row: row,
+        col: col
+    };
+
+    debugLog('SEND', 'Sending move to /app/move', moveRequest);
+    stompClient.send('/app/move', {}, JSON.stringify(moveRequest));
+    debugLog('SEND', '✅ Move request sent');
+}
+
+function updateBoard(gameState) {
+    debugLog('RECEIVE', '📊 Updating board', {
+        gameId: gameState.gameId,
+        status: gameState.status,
+        currentTurn: gameState.currentTurn,
+        winner: gameState.winner
+    });
+
+    const board = gameState.board;
+    for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+            const cell = document.querySelector(`[data-row="${i}"][data-col="${j}"]`);
+            const value = board[i][j];
+
+            if (value === 'X') {
+                cell.textContent = '✕';
+                cell.classList.add('filled', 'x');
+                cell.classList.remove('o');
+            } else if (value === 'O') {
+                cell.textContent = '○';
+                cell.classList.add('filled', 'o');
+                cell.classList.remove('x');
+            } else {
+                cell.textContent = '';
+                cell.classList.remove('filled', 'x', 'o');
+            }
+        }
+    }
+
+    const turnIndicator = document.getElementById('turnIndicator');
+    turnIndicator.textContent = (gameState.currentTurn === 'X' ? '✕' : '○') + ' Turn';
+
+    if (gameState.player1) {
+        document.getElementById('player1Name').textContent =
+            gameState.player1.nickname + (gameState.player1.nickname === currentPlayer ? ' (you)' : '');
+        document.getElementById('player1Stats').textContent =
+            `${gameState.player1.wins}/${gameState.player1.losses}/${gameState.player1.draws}`;
+        mySymbol = gameState.player1.nickname === currentPlayer ? 'X' : 'O';
+        debugLog('INFO', `My symbol is: ${mySymbol}`);
+    }
+
+    if (gameState.player2) {
+        document.getElementById('player2Name').textContent =
+            gameState.player2.nickname + (gameState.player2.nickname === currentPlayer ? ' (you)' : ' (opp)');
+        document.getElementById('player2Stats').textContent =
+            `${gameState.player2.wins}/${gameState.player2.losses}/${gameState.player2.draws}`;
+    }
+
+    const messageDiv = document.getElementById('gameMessage');
+    if (gameState.status === 'FINISHED') {
+        debugLog('INFO', '🏁 Game FINISHED!', { winner: gameState.winner, mySymbol: mySymbol });
+        messageDiv.style.display = 'block';
+
+        if (gameState.winner === mySymbol) {
+            messageDiv.className = 'message';
+            messageDiv.textContent = mySymbol + ' WINNER! +200 pts';
+        } else if (gameState.winner === 'DRAW') {
+            messageDiv.className = 'message info';
+            messageDiv.textContent = 'Game ended in a draw!';
+        } else {
+            messageDiv.className = 'message error';
+            messageDiv.textContent = 'You lost. Try again!';
+        }
+        document.getElementById('playAgainBtn').style.display = 'block';
+    } else {
+        messageDiv.style.display = 'none';
+        document.getElementById('playAgainBtn').style.display = 'none';
+    }
+}
+
+function playAgain() {
+    debugLog('INFO', '🔄 Play again clicked');
+    document.getElementById('playAgainBtn').style.display = 'none';
+    document.getElementById('gameMessage').style.display = 'none';
+
+    document.querySelectorAll('.cell').forEach(cell => {
+        cell.textContent = '';
+        cell.classList.remove('filled', 'x', 'o');
+    });
+
+    currentGameId = null;
+    connectWebSocket();
+}
+
+function exitGame() {
+    debugLog('INFO', '🚪 Exiting game');
+    if (stompClient) {
+        stompClient.disconnect(() => debugLog('CONNECT', 'STOMP client disconnected'));
+        stompClient = null;
+    }
+    currentGameId = null;
+    showScreen('nicknameScreen');
+}
+
+function showLeaderboard() {
+    showScreen('leaderboardScreen');
+    loadLeaderboard();
+}
+
+function hideLeaderboard() {
+    showScreen('nicknameScreen');
+}
+
+function loadLeaderboard() {
+    debugLog('INFO', 'Loading leaderboard...');
+    fetch(API_URL + '/api/leaderboard?limit=10')
+        .then(response => response.json())
+        .then(data => {
+            debugLog('RECEIVE', 'Leaderboard data received', data);
+            const tbody = document.getElementById('leaderboardBody');
+            tbody.innerHTML = '';
+            data.forEach((player, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="rank">${index + 1}</td>
+                    <td>${player.nickname}</td>
+                    <td>${player.record}</td>
+                    <td><strong>${player.totalScore}</strong></td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No players yet</td></tr>';
+            }
+        })
+        .catch(error => {
+            debugLog('ERROR', 'Error loading leaderboard', error);
+            document.getElementById('leaderboardBody').innerHTML =
+                '<tr><td colspan="4" style="text-align: center;">Error loading leaderboard</td></tr>';
+        });
+}
+
+function startCountdown(seconds) {
+    const countdownElement = document.querySelector('#matchmakingScreen p');
+    let timeLeft = seconds;
+
+    if (!countdownElement) {
+        debugLog('ERROR', 'Countdown element not found!');
+        return;
+    }
+    countdownElement.textContent = `It usually takes ${timeLeft} seconds.`;
+
+    clearInterval(countdownInterval);
+
+    countdownInterval = setInterval(() => {
+        timeLeft--;
+        if (timeLeft <= 0) {
+            clearInterval(countdownInterval);
+            countdownElement.textContent = 'Still searching, please wait...';
+        } else {
+            countdownElement.textContent = `It usually takes ${timeLeft} seconds.`;
+        }
+    }, 1000);
+
+    debugLog('INFO', 'Countdown started');
+}
+
+function showScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(screen => {
+        screen.classList.remove('active');
+    });
+    document.getElementById(screenId).classList.add('active');
+    debugLog('INFO', `Screen changed to: ${screenId}`);
+
+    if(screenId === 'matchmakingScreen') {
+        startCountdown(26);
+    } else {
+        clearInterval(countdownInterval);
+    }
+}
+</script>
+</body>
+</html>
