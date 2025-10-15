@@ -17,6 +17,15 @@ public class GameService {
     private final Queue<String> waitingPlayers = new LinkedList<>();
     private final Map<String, String> playerToGameMap = new ConcurrentHashMap<>();
     private final Map<String, LocalDateTime> playerJoinTime = new ConcurrentHashMap<>();
+    private final Map<String, LocalDateTime> playerLastActivity = new ConcurrentHashMap<>();
+
+    // Track player sessions
+    private final Map<String, String> playerSessions = new ConcurrentHashMap<>();
+
+    // Constants
+    private static final int STALE_PLAYER_TIMEOUT_SECONDS = 60;
+    private static final int INACTIVE_PLAYER_TIMEOUT_SECONDS = 180; // 3 minutes
+    private static final int GAME_TIMEOUT_MINUTES = 10;
 
     public synchronized String joinMatchmaking(Player player) {
         String nickname = player.getNickname();
@@ -24,6 +33,9 @@ public class GameService {
         log.info("🔍 [MATCHMAKING] Player '{}' requesting to join", nickname);
         log.info("📊 [MATCHMAKING] Current state - Waiting: {}, Active Games: {}",
                 waitingPlayers.size(), activeGames.size());
+
+        // Update player activity
+        updatePlayerActivity(nickname);
 
         // Check if player is already in a game
         if (playerToGameMap.containsKey(nickname)) {
@@ -37,8 +49,7 @@ public class GameService {
                 return existingGameId;
             } else {
                 log.warn("⚠️ [MATCHMAKING] Existing game '{}' is null or finished, removing mapping", existingGameId);
-                playerToGameMap.remove(nickname);
-                playerJoinTime.remove(nickname);
+                removePlayerFromGame(nickname);
             }
         }
 
@@ -48,8 +59,9 @@ public class GameService {
             return null;
         }
 
-        // Clean up stale waiting players (over 60 seconds old)
-        cleanupStaleWaitingPlayers();
+        // Clean up stale and inactive players
+        cleanupStalePlayers();
+        cleanupInactivePlayers();
 
         // Check if there's a waiting player (but not the same player!)
         if (!waitingPlayers.isEmpty()) {
@@ -58,7 +70,6 @@ public class GameService {
             // CRITICAL FIX: Prevent self-matching
             if (waitingPlayerNickname.equals(nickname)) {
                 log.error("❌ [MATCHMAKING] Prevented self-matching for player '{}'", nickname);
-                // Put player back in queue
                 waitingPlayers.offer(nickname);
                 playerJoinTime.put(nickname, LocalDateTime.now());
                 return null;
@@ -66,14 +77,6 @@ public class GameService {
 
             log.info("🤝 [MATCHMAKING] Found waiting player: '{}'", waitingPlayerNickname);
             log.info("🤝 [MATCHMAKING] Pairing '{}' with '{}'", waitingPlayerNickname, nickname);
-
-            // Verify both players are different
-            if (waitingPlayerNickname.equals(nickname)) {
-                log.error("❌ [CRITICAL] Self-matching detected and prevented!");
-                waitingPlayers.offer(nickname);
-                playerJoinTime.put(nickname, LocalDateTime.now());
-                return null;
-            }
 
             // Remove from join time tracking
             playerJoinTime.remove(waitingPlayerNickname);
@@ -111,8 +114,11 @@ public class GameService {
         }
     }
 
-    private void cleanupStaleWaitingPlayers() {
-        LocalDateTime cutoffTime = LocalDateTime.now().minusSeconds(60);
+    /**
+     * Remove stale players from waiting queue (over 60 seconds old)
+     */
+    private void cleanupStalePlayers() {
+        LocalDateTime cutoffTime = LocalDateTime.now().minusSeconds(STALE_PLAYER_TIMEOUT_SECONDS);
         List<String> toRemove = new ArrayList<>();
 
         for (String nickname : waitingPlayers) {
@@ -124,9 +130,56 @@ public class GameService {
         }
 
         for (String nickname : toRemove) {
-            waitingPlayers.remove(nickname);
-            playerJoinTime.remove(nickname);
+            removePlayerFromQueue(nickname);
         }
+    }
+
+    /**
+     * Remove inactive players from games (no activity for 3 minutes)
+     */
+    private void cleanupInactivePlayers() {
+        LocalDateTime cutoffTime = LocalDateTime.now().minusSeconds(INACTIVE_PLAYER_TIMEOUT_SECONDS);
+        List<String> gamesToEnd = new ArrayList<>();
+
+        for (Map.Entry<String, Game> entry : activeGames.entrySet()) {
+            Game game = entry.getValue();
+            String gameId = entry.getKey();
+
+            if (game.getStatus() != Game.GameStatus.IN_PROGRESS) {
+                continue;
+            }
+
+            // Check if game has timed out (no moves for too long)
+            if (game.getLastMoveAt() != null &&
+                    game.getLastMoveAt().isBefore(LocalDateTime.now().minusMinutes(GAME_TIMEOUT_MINUTES))) {
+                log.info("⏰ [CLEANUP] Game '{}' timed out", gameId);
+                gamesToEnd.add(gameId);
+                continue;
+            }
+
+            // Check player inactivity
+            boolean player1Inactive = isPlayerInactive(game.getPlayer1().getNickname(), cutoffTime);
+            boolean player2Inactive = isPlayerInactive(game.getPlayer2().getNickname(), cutoffTime);
+
+            if (player1Inactive || player2Inactive) {
+                log.info("⏰ [CLEANUP] Game '{}' has inactive player(s)", gameId);
+                game.setStatus(Game.GameStatus.ABANDONED);
+                gamesToEnd.add(gameId);
+            }
+        }
+
+        for (String gameId : gamesToEnd) {
+            endGame(gameId);
+        }
+    }
+
+    private boolean isPlayerInactive(String nickname, LocalDateTime cutoffTime) {
+        LocalDateTime lastActivity = playerLastActivity.get(nickname);
+        return lastActivity == null || lastActivity.isBefore(cutoffTime);
+    }
+
+    public void updatePlayerActivity(String nickname) {
+        playerLastActivity.put(nickname, LocalDateTime.now());
     }
 
     public Game getGame(String gameId) {
@@ -137,6 +190,9 @@ public class GameService {
 
     public boolean makeMove(String gameId, String nickname, int row, int col) {
         log.info("🎯 [MAKE-MOVE] GameId: {} | Player: {} | Position: ({},{})", gameId, nickname, row, col);
+
+        // Update player activity
+        updatePlayerActivity(nickname);
 
         Game game = activeGames.get(gameId);
         if (game == null) {
@@ -177,14 +233,12 @@ public class GameService {
             // Remove player mappings
             if (game.getPlayer1() != null) {
                 String p1Nick = game.getPlayer1().getNickname();
-                playerToGameMap.remove(p1Nick);
-                playerJoinTime.remove(p1Nick);
+                removePlayerFromGame(p1Nick);
                 log.info("🔚 [END-GAME] Removed player1 mapping: {}", p1Nick);
             }
             if (game.getPlayer2() != null) {
                 String p2Nick = game.getPlayer2().getNickname();
-                playerToGameMap.remove(p2Nick);
-                playerJoinTime.remove(p2Nick);
+                removePlayerFromGame(p2Nick);
                 log.info("🔚 [END-GAME] Removed player2 mapping: {}", p2Nick);
             }
 
@@ -196,14 +250,98 @@ public class GameService {
         }
     }
 
+    /**
+     * Cancel matchmaking - removes player from queue
+     */
     public void cancelMatchmaking(String nickname) {
         log.info("🚫 [CANCEL] Player '{}' canceling matchmaking", nickname);
+        removePlayerFromQueue(nickname);
+    }
 
+    /**
+     * Remove player from waiting queue
+     */
+    public void removePlayerFromQueue(String nickname) {
         boolean removed = waitingPlayers.remove(nickname);
+        playerJoinTime.remove(nickname);
+        playerLastActivity.remove(nickname);
+
+        log.info("🚫 [REMOVE-QUEUE] Player '{}' removed from queue: {} | Waiting players: {}",
+                nickname, removed, waitingPlayers.size());
+    }
+
+    /**
+     * Remove player from game mappings
+     */
+    private void removePlayerFromGame(String nickname) {
         playerToGameMap.remove(nickname);
         playerJoinTime.remove(nickname);
+        playerSessions.remove(nickname);
+    }
 
-        log.info("🚫 [CANCEL] Removed from queue: {} | Waiting players: {}", removed, waitingPlayers.size());
+    /**
+     * Handle player disconnect - clean up all references
+     */
+    public void handlePlayerDisconnect(String nickname) {
+        log.info("🔌 [DISCONNECT] Player '{}' disconnected", nickname);
+
+        // Remove from waiting queue
+        removePlayerFromQueue(nickname);
+
+        // Check if player is in an active game
+        String gameId = playerToGameMap.get(nickname);
+        if (gameId != null) {
+            Game game = activeGames.get(gameId);
+            if (game != null && game.getStatus() == Game.GameStatus.IN_PROGRESS) {
+                log.info("🔌 [DISCONNECT] Marking game '{}' as abandoned", gameId);
+                game.setStatus(Game.GameStatus.ABANDONED);
+
+                // Notify the other player that opponent disconnected
+                String opponentNickname = getOpponentNickname(game, nickname);
+                if (opponentNickname != null) {
+                    log.info("🔌 [DISCONNECT] Opponent in game: '{}'", opponentNickname);
+                }
+            }
+        }
+
+        // Clean up all player data
+        removePlayerFromGame(nickname);
+    }
+
+    private String getOpponentNickname(Game game, String playerNickname) {
+        if (game.getPlayer1() != null && game.getPlayer1().getNickname().equals(playerNickname)) {
+            return game.getPlayer2() != null ? game.getPlayer2().getNickname() : null;
+        } else if (game.getPlayer2() != null && game.getPlayer2().getNickname().equals(playerNickname)) {
+            return game.getPlayer1() != null ? game.getPlayer1().getNickname() : null;
+        }
+        return null;
+    }
+
+    /**
+     * Register player session (called on WebSocket connect)
+     */
+    public void registerPlayerSession(String nickname, String sessionId) {
+        playerSessions.put(nickname, sessionId);
+        updatePlayerActivity(nickname);
+        log.info("📝 [SESSION] Registered session for player '{}': {}", nickname, sessionId);
+    }
+
+    /**
+     * Unregister player session (called on WebSocket disconnect)
+     */
+    public void unregisterPlayerSession(String sessionId) {
+        String nickname = null;
+        for (Map.Entry<String, String> entry : playerSessions.entrySet()) {
+            if (entry.getValue().equals(sessionId)) {
+                nickname = entry.getKey();
+                break;
+            }
+        }
+
+        if (nickname != null) {
+            log.info("📝 [SESSION] Unregistering session for player '{}': {}", nickname, sessionId);
+            handlePlayerDisconnect(nickname);
+        }
     }
 
     public int getActiveGamesCount() {
@@ -220,5 +358,31 @@ public class GameService {
 
     public List<String> getWaitingPlayersList() {
         return new ArrayList<>(waitingPlayers);
+    }
+
+    /**
+     * Get statistics for monitoring
+     */
+    public Map<String, Object> getDetailedStats() {
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("activeGames", activeGames.size());
+        stats.put("waitingPlayers", waitingPlayers.size());
+        stats.put("activeSessions", playerSessions.size());
+        stats.put("playersInGames", playerToGameMap.size());
+        return stats;
+    }
+
+    /**
+     * Check if a player is currently in a game
+     */
+    public boolean isPlayerInGame(String nickname) {
+        return playerToGameMap.containsKey(nickname);
+    }
+
+    /**
+     * Check if a player is in waiting queue
+     */
+    public boolean isPlayerWaiting(String nickname) {
+        return waitingPlayers.contains(nickname);
     }
 }

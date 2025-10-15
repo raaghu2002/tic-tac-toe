@@ -133,7 +133,15 @@
             background: #5a6268;
         }
 
-        /* Matchmaking Screen */
+        .danger-btn {
+            background: #dc3545;
+            margin-top: 10px;
+        }
+
+        .danger-btn:hover {
+            background: #c82333;
+        }
+
         .loading {
             text-align: center;
             padding: 40px 0;
@@ -154,7 +162,6 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Game Board */
         .game-info {
             display: flex;
             justify-content: space-between;
@@ -194,16 +201,6 @@
             color: #333;
             margin-bottom: 5px;
             font-size: 14px;
-        }
-
-        .player-badge {
-            display: inline-block;
-            background: #667eea;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            margin-left: 5px;
         }
 
         .player-symbol {
@@ -323,7 +320,6 @@
             color: #856404;
         }
 
-        /* Modal Styles */
         .modal {
             display: none;
             position: fixed;
@@ -368,7 +364,6 @@
             display: inline-block;
         }
 
-        /* Leaderboard */
         .leaderboard-table {
             width: 100%;
             border-collapse: collapse;
@@ -392,17 +387,6 @@
             background: #f8f9fa;
         }
 
-        .rank {
-            font-weight: bold;
-            color: #667eea;
-        }
-
-        .stats {
-            font-size: 12px;
-            color: #666;
-            margin-top: 5px;
-        }
-
         .connection-status {
             position: fixed;
             top: 20px;
@@ -424,6 +408,12 @@
         .connection-status.connecting {
             background: #ffc107;
             color: #333;
+        }
+
+        .stats {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
         }
 
         @media (max-width: 600px) {
@@ -468,7 +458,6 @@
 
     <!-- Matchmaking Screen -->
     <div id="matchmakingScreen" class="screen">
-        <button class="close-btn" onclick="cancelMatchmaking()">✕</button>
         <h2>Finding an opponent...</h2>
         <div class="loading">
             <div class="spinner"></div>
@@ -510,6 +499,7 @@
         <div id="gameMessage" class="message" style="display: none;"></div>
 
         <button id="playAgainBtn" onclick="playAgain()" style="display: none;">Play Again</button>
+        <button id="forfeitBtn" class="danger-btn" onclick="forfeitGame()" style="display: none;">Forfeit Game</button>
         <button class="secondary-btn" onclick="exitGame()">Exit Game</button>
     </div>
 
@@ -551,6 +541,7 @@
 
     const WS_URL = API_URL + '/ws';
     const MATCHMAKING_TIMEOUT = 30000; // 30 seconds
+    const HEARTBEAT_INTERVAL = 10000; // 10 seconds
 
     let stompClient = null;
     let currentPlayer = null;
@@ -558,6 +549,7 @@
     let mySymbol = null;
     let countdownInterval = null;
     let matchmakingTimeout = null;
+    let heartbeatInterval = null;
     let isMyTurn = false;
 
     // Connection status
@@ -628,7 +620,22 @@
                     currentGameId = response.gameId;
                     subscribeToGameUpdates(currentGameId);
                     showScreen('gameScreen');
+
+                    // Show forfeit button when game starts
+                    document.getElementById('forfeitBtn').style.display = 'block';
+
+                    // Start heartbeat
+                    startHeartbeat();
+                } else if (response.status === 'CANCELLED') {
+                    showScreen('nicknameScreen');
                 }
+            });
+
+            // Subscribe to error messages
+            const errorDest = '/queue/error-' + currentPlayer;
+            stompClient.subscribe(errorDest, function(message) {
+                const error = JSON.parse(message.body);
+                showTemporaryMessage(error.message, 'error');
             });
 
             const joinRequest = { nickname: currentPlayer };
@@ -689,12 +696,19 @@
     }
 
     function cancelMatchmaking() {
+        if (stompClient && currentPlayer) {
+            const cancelRequest = { nickname: currentPlayer };
+            stompClient.send('/app/cancel', {}, JSON.stringify(cancelRequest));
+        }
+
         if (stompClient) {
             stompClient.disconnect();
             stompClient = null;
         }
+
         clearTimeout(matchmakingTimeout);
         clearInterval(countdownInterval);
+        stopHeartbeat();
         currentGameId = null;
         updateConnectionStatus('disconnected');
         setTimeout(() => {
@@ -726,6 +740,43 @@
         };
 
         stompClient.send('/app/move', {}, JSON.stringify(moveRequest));
+    }
+
+    function forfeitGame() {
+        if (!currentGameId || !currentPlayer) {
+            return;
+        }
+
+        if (confirm('Are you sure you want to forfeit? You will lose the game.')) {
+            const forfeitRequest = {
+                gameId: currentGameId,
+                nickname: currentPlayer
+            };
+
+            stompClient.send('/app/forfeit', {}, JSON.stringify(forfeitRequest));
+            document.getElementById('forfeitBtn').style.display = 'none';
+        }
+    }
+
+    function startHeartbeat() {
+        stopHeartbeat(); // Clear any existing interval
+
+        heartbeatInterval = setInterval(() => {
+            if (stompClient && stompClient.connected && currentPlayer) {
+                const heartbeat = {
+                    nickname: currentPlayer,
+                    gameId: currentGameId
+                };
+                stompClient.send('/app/heartbeat', {}, JSON.stringify(heartbeat));
+            }
+        }, HEARTBEAT_INTERVAL);
+    }
+
+    function stopHeartbeat() {
+        if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+            heartbeatInterval = null;
+        }
     }
 
     function updateBoard(gameState) {
