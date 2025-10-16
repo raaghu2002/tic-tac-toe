@@ -385,4 +385,74 @@ public class GameService {
     public boolean isPlayerWaiting(String nickname) {
         return waitingPlayers.contains(nickname);
     }
+
+    /**
+     * Clear all players from waiting queue
+     * @return number of players removed
+     */
+    public synchronized int clearWaitingQueue() {
+        int count = waitingPlayers.size();
+
+        log.info("🧹 [ADMIN] Clearing waiting queue. Removing {} players", count);
+
+        // Remove all players from queue
+        List<String> playersToRemove = new ArrayList<>(waitingPlayers);
+
+        for (String nickname : playersToRemove) {
+            waitingPlayers.remove(nickname);
+            playerJoinTime.remove(nickname);
+            playerLastActivity.remove(nickname);
+            log.info("🧹 [ADMIN] Removed player '{}' from queue", nickname);
+        }
+
+        log.info("✅ [ADMIN] Queue cleared. Removed {} players", count);
+        return count;
+    }
+
+    /**
+     * Clear all inactive sessions and games
+     * @return statistics about cleanup
+     */
+    public synchronized Map<String, Integer> clearAllInactive() {
+        Map<String, Integer> stats = new HashMap<>();
+
+        // Clear stale players from queue
+        cleanupStalePlayers();
+
+        // Clear inactive games
+        cleanupInactivePlayers();
+
+        stats.put("waitingQueueSize", waitingPlayers.size());
+        stats.put("activeGames", activeGames.size());
+        stats.put("activeSessions", playerSessions.size());
+
+        log.info("🧹 [ADMIN] Cleanup completed: {}", stats);
+
+        return stats;
+    }
+
+    /**
+     * Force clear all game state (NUCLEAR OPTION)
+     * Use only in emergency situations
+     */
+    public synchronized Map<String, Integer> forceResetAll() {
+        log.warn("⚠️ [ADMIN] FORCE RESET - Clearing ALL game state");
+
+        Map<String, Integer> beforeStats = new HashMap<>();
+        beforeStats.put("activeGames", activeGames.size());
+        beforeStats.put("waitingPlayers", waitingPlayers.size());
+        beforeStats.put("playerSessions", playerSessions.size());
+
+        // Clear everything
+        activeGames.clear();
+        waitingPlayers.clear();
+        playerToGameMap.clear();
+        playerJoinTime.clear();
+        playerLastActivity.clear();
+        playerSessions.clear();
+
+        log.warn("🧹 [ADMIN] Force reset completed. Cleared: {}", beforeStats);
+
+        return beforeStats;
+    }
 }

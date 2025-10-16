@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,6 +78,52 @@ public class RestApiController {
         response.put("status", "OK");
         response.put("message", "Server is running!");
         response.put("timestamp", java.time.LocalDateTime.now().toString());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Admin endpoint to clear matchmaking queue
+     * USE WITH CAUTION: This will remove all waiting players
+     */
+    @DeleteMapping("/admin/queue/clear")
+    public ResponseEntity<Map<String, Object>> clearQueue() {
+        int removedCount = gameService.clearWaitingQueue();
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", "Queue cleared successfully");
+        response.put("removedPlayers", removedCount);
+        response.put("timestamp", LocalDateTime.now());
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Admin endpoint to get detailed queue information
+     */
+    @GetMapping("/admin/queue/details")
+    public ResponseEntity<Map<String, Object>> getQueueDetails() {
+        Map<String, Object> details = gameService.getDetailedStats();
+        List<String> waitingPlayers = gameService.getWaitingPlayersList();
+
+        details.put("waitingPlayersList", waitingPlayers);
+        details.put("timestamp", LocalDateTime.now());
+
+        return ResponseEntity.ok(details);
+    }
+
+    /**
+     * Admin endpoint to remove specific player from queue
+     */
+    @DeleteMapping("/admin/queue/remove/{nickname}")
+    public ResponseEntity<Map<String, String>> removePlayerFromQueue(@PathVariable String nickname) {
+        gameService.removePlayerFromQueue(nickname);
+
+        Map<String, String> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", "Player removed from queue");
+        response.put("nickname", nickname);
+
         return ResponseEntity.ok(response);
     }
 }
