@@ -565,7 +565,7 @@ Contributions are welcome! Please follow these steps:
 
 ## 👥 Authors
 
-- **Your Name** - *Initial work* - [YourGitHub](https://github.com/raaghu2002)
+- **Your Name** - *Initial work* - [GitHub](https://github.com/raaghu2002)
 
 ## 🙏 Acknowledgments
 
@@ -576,8 +576,8 @@ Contributions are welcome! Please follow these steps:
 ## 📧 Contact
 
 - **Email**: raaghu2002@gmail.com
-- **LinkedIn**: [Your Profile](https://linkedin.com/in/raghavendra2002)
-- **GitHub**: [Your Profile](https://github.com/raaghu2002)
+- **LinkedIn**: [Profile](https://linkedin.com/in/raghavendra2002)
+- **GitHub**: [Profile](https://github.com/raaghu2002)
 
 ## 📈 Project Status
 
@@ -588,4 +588,5 @@ Contributions are welcome! Please follow these steps:
 ---
 
 Made with ❤️ using Spring Boot
+
 
