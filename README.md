@@ -8,7 +8,7 @@ A real-time multiplayer Tic-Tac-Toe game built with Spring Boot and WebSocket te
 🔗 Quick Links
 
 - 🎮 Live Demo: https://tic-tac-toe-nyo1.onrender.com
-- 💻 GitHub Repository: https://github.com/raaghu2002/tic-tac-toe.git
+- 📖 Documentation PDF: https://1drv.ms/b/c/eb8e64798a554294/EfBiNjfCrjVHiHEgab-d6i0BWUYUmdpYZyAC7hUhvEveYg?e=sAge5c
 - 📖 API Documentation: Swagger UI
 - 🏥 Health Check: API Health
 
@@ -595,6 +595,7 @@ Contributions are welcome! Please follow these steps:
 ---
 
 Made with ❤️ using Spring Boot
+
 
 
 
