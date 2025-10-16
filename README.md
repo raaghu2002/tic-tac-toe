@@ -1,11 +1,10 @@
-﻿# tic-tac-toe
 # 🎮 Multiplayer Tic-Tac-Toe
 
 A real-time multiplayer Tic-Tac-Toe game built with Spring Boot and WebSocket technology.
 
 [![Java](https://img.shields.io/badge/Java-17-orange.svg)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.6-brightgreen.svg)](https://spring.io/projects/spring-boot)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 
 ## 📋 Table of Contents
 
@@ -134,7 +133,7 @@ RestApiController (REST)
 
 #### 1. Clone the Repository
 ```bash
-git clone https://github.com/yourusername/tictactoe.git
+git clone https://github.com/raaghu/tic-tac-toe.git
 cd tictactoe
 ```
 
@@ -388,79 +387,6 @@ docker run -p 8081:8081 \
   tictactoe:latest
 ```
 
-### Docker Compose
-
-```yaml
-version: '3.8'
-
-services:
-  postgres:
-    image: postgres:15
-    environment:
-      POSTGRES_DB: tictactoe
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  app:
-    build: .
-    ports:
-      - "8081:8081"
-    environment:
-      SPRING_PROFILES_ACTIVE: prod
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: tictactoe
-      DB_USERNAME: postgres
-      DB_PASSWORD: password
-    depends_on:
-      - postgres
-
-volumes:
-  postgres_data:
-```
-
-Run with:
-```bash
-docker-compose up -d
-```
-
-### Cloud Deployment
-
-#### Heroku
-```bash
-# Install Heroku CLI
-# Create Heroku app
-heroku create your-app-name
-
-# Add PostgreSQL addon
-heroku addons:create heroku-postgresql:mini
-
-# Deploy
-git push heroku main
-
-# Open application
-heroku open
-```
-
-#### AWS Elastic Beanstalk
-```bash
-# Install EB CLI
-pip install awsebcli
-
-# Initialize EB
-eb init -p java-17 tictactoe
-
-# Create environment
-eb create tictactoe-env
-
-# Deploy
-eb deploy
-```
-
 ## 🧪 Testing
 
 ### Manual Testing
@@ -636,13 +562,10 @@ Contributions are welcome! Please follow these steps:
 - Write unit tests for new features
 - Keep methods small and focused
 
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 👥 Authors
 
-- **Your Name** - *Initial work* - [YourGitHub](https://github.com/yourusername)
+- **Your Name** - *Initial work* - [YourGitHub](https://github.com/raaghu2002)
 
 ## 🙏 Acknowledgments
 
@@ -652,9 +575,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📧 Contact
 
-- **Email**: your.email@example.com
-- **LinkedIn**: [Your Profile](https://linkedin.com/in/yourprofile)
-- **GitHub**: [Your Profile](https://github.com/yourusername)
+- **Email**: raaghu2002@gmail.com
+- **LinkedIn**: [Your Profile](https://linkedin.com/in/raghavendra2002)
+- **GitHub**: [Your Profile](https://github.com/raaghu2002)
 
 ## 📈 Project Status
 
@@ -665,3 +588,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 Made with ❤️ using Spring Boot
+
